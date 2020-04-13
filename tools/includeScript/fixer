@@ -1,0 +1,13 @@
+#!/bin/bash
+filename=headerTest.adoc
+attributesFile=attributes-v1.adoc
+echo $filename
+line=$(head -n 1 $filename)
+echo -n "First line is "
+echo $line
+if [ "$line" = "ifdef::standalone-module[]" ]; then
+	echo "First line matches"
+else
+	echo "First line NO match"
+	sed -i '1s;^;ifdef::standalone-module[]\ninclude::$attributesFile[]\nendif::[]\n;' $filename
+fi
