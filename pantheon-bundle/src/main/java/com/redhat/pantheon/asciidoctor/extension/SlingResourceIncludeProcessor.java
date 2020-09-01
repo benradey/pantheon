@@ -45,6 +45,7 @@ public class SlingResourceIncludeProcessor extends IncludeProcessor {
 
     @Override
     public void process(Document document, PreprocessorReader reader, String target, Map<String, Object> attributes) {
+        System.out.println("Include processor resolving: " + target);
         log.trace("Attempting to include {}", target);
         log.trace("Parent: {}", parent);
         log.trace("reader.getDir(): {}", reader.getDir());
@@ -110,6 +111,7 @@ public class SlingResourceIncludeProcessor extends IncludeProcessor {
             log.warn("Could not find include for {}", target);
         }
 
+        System.out.println("Finished resolving content for " + target);
         reader.push_include(content, target, target, 1, attributes);
     }
 

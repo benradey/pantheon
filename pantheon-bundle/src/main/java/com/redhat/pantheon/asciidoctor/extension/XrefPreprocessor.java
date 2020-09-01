@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -45,85 +46,93 @@ public class XrefPreprocessor extends Preprocessor {
 
     @Override
     public void process(org.asciidoctor.ast.Document adocDocument, @NotNull PreprocessorReader reader) {
-        reader.restoreLines(preprocess(reader.readLines()));
-    }
+//        reader.restoreLines(preprocess(reader.readLines()));
 
-    private String processLineWithPattern(String line, Pattern pattern) {
-        Matcher matcher = pattern.matcher(line);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String originalTarget = matcher.group("filepath");
-            // Assume it's a relative path to a file in the same repo for now
-            Resource containingFolder = documentVariant.getParentLocale().getParent().getParent();
-            String targetPath = containingFolder.getPath() + "/" + originalTarget;
-            Resource desiredTarget = documentVariant.getResourceResolver().getResource(targetPath);
-            if (desiredTarget == null ||
-                    (!PantheonConstants.RESOURCE_TYPE_ASSEMBLY.equals(desiredTarget.getResourceType())
-                            && !PantheonConstants.RESOURCE_TYPE_MODULE.equals(desiredTarget.getResourceType()))) {
-                // Either can't tell what the author is trying to link to,
-                // or they are linking to something that is not publishable,
-                // either way just leave the xref alone and hope for the best
-                // TODO - plug in a validation warning/error here once validation is a thing
-                matcher.appendReplacement(sb, matcher.group(0));
-            } else {
-                Document docTarget = desiredTarget.adaptTo(Document.class);
-                StringBuilder replacement = new StringBuilder("xref:");
-                String anchor = matcher.group("anchor");
-
-                // If we enter this if-block, then we assume that we are linking OUTSIDE of this doc.
-                // For example, from one standlone module to another standalone module.
-                // If we DO NOT enter this if-block, then we assume that we are linking INSIDE of this doc.
-                // For example, from one module inside an assembly to another module inside the same assembly.
-                if (!modulePaths.contains(docTarget.getPath())) {
-                    String targetUuid = docTarget
-                            .child(documentVariant.getParentLocale().getName(), DocumentLocale.class).get() // TODO - assume same locale for now
-                            .variants().get()
-                            .variant(documentVariant.getName()).get() // TODO - assume same variant for now
-                            .uuid().get();
-
-                    replacement.append(targetUuid);
-                } else if (anchor == null || anchor.isEmpty()) {
-                    // If we land here, it means:
-                    // 1.) We are linking INSIDE of this document
-                    // 2.) The user did not specify an anchor.
-                    // How does this happen? Answer: when you're building an assembly, and the user xrefs from
-                    // one module to another module via filepath only. In this scenario, we link them to the
-                    // beginning of the module, which is an anchor that is injected by the include processor.
-                    anchor = "_" + docTarget.uuid().get();
-                }
-
-                replacement.append("#")
-                        .append(anchor == null ? "" : anchor)
-                        .append("[")
-                        .append(matcher.group("label"))
-                        .append("]");
-
-                matcher.appendReplacement(sb, replacement.toString());
-            }
+        List<String> lines = new LinkedList<>();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            System.out.println("Preprocessor line: " + line);
+            lines.add(line);
         }
-        matcher.appendTail(sb);
-        return sb.toString();
+        reader.restoreLines(lines);
     }
 
-    /**
-     * At this point, the Table of Contents that was used to construct this object must be populated.
-     * @param lines
-     * @return
-     */
-    public List<String> preprocess(@NotNull List<String> lines) {
-        toc.getEntries().stream()
-                .map(TableOfContents.Entry::getModuleVariant)
-                .map(ModuleVariant::getParentLocale)
-                .map(ModuleLocale::getParent)
-                .map(Module::getPath)
-                .forEach(modulePaths::add);
-
-        List<String> output = new ArrayList<>();
-
-        lines.stream().map(line -> processLineWithPattern(line, XREF_PATTERN))
-                .map(line -> processLineWithPattern(line, TRIANGLE_PATTERN))
-                .forEach(output::add);
-
-        return output;
-    }
+//    private String processLineWithPattern(String line, Pattern pattern) {
+//        Matcher matcher = pattern.matcher(line);
+//        StringBuffer sb = new StringBuffer();
+//        while (matcher.find()) {
+//            String originalTarget = matcher.group("filepath");
+//            // Assume it's a relative path to a file in the same repo for now
+//            Resource containingFolder = documentVariant.getParentLocale().getParent().getParent();
+//            String targetPath = containingFolder.getPath() + "/" + originalTarget;
+//            Resource desiredTarget = documentVariant.getResourceResolver().getResource(targetPath);
+//            if (desiredTarget == null ||
+//                    (!PantheonConstants.RESOURCE_TYPE_ASSEMBLY.equals(desiredTarget.getResourceType())
+//                            && !PantheonConstants.RESOURCE_TYPE_MODULE.equals(desiredTarget.getResourceType()))) {
+//                // Either can't tell what the author is trying to link to,
+//                // or they are linking to something that is not publishable,
+//                // either way just leave the xref alone and hope for the best
+//                // TODO - plug in a validation warning/error here once validation is a thing
+//                matcher.appendReplacement(sb, matcher.group(0));
+//            } else {
+//                Document docTarget = desiredTarget.adaptTo(Document.class);
+//                StringBuilder replacement = new StringBuilder("xref:");
+//                String anchor = matcher.group("anchor");
+//
+//                // If we enter this if-block, then we assume that we are linking OUTSIDE of this doc.
+//                // For example, from one standlone module to another standalone module.
+//                // If we DO NOT enter this if-block, then we assume that we are linking INSIDE of this doc.
+//                // For example, from one module inside an assembly to another module inside the same assembly.
+//                if (!modulePaths.contains(docTarget.getPath())) {
+//                    String targetUuid = docTarget
+//                            .child(documentVariant.getParentLocale().getName(), DocumentLocale.class).get() // TODO - assume same locale for now
+//                            .variants().get()
+//                            .variant(documentVariant.getName()).get() // TODO - assume same variant for now
+//                            .uuid().get();
+//
+//                    replacement.append(targetUuid);
+//                } else if (anchor == null || anchor.isEmpty()) {
+//                    // If we land here, it means:
+//                    // 1.) We are linking INSIDE of this document
+//                    // 2.) The user did not specify an anchor.
+//                    // How does this happen? Answer: when you're building an assembly, and the user xrefs from
+//                    // one module to another module via filepath only. In this scenario, we link them to the
+//                    // beginning of the module, which is an anchor that is injected by the include processor.
+//                    anchor = "_" + docTarget.uuid().get();
+//                }
+//
+//                replacement.append("#")
+//                        .append(anchor == null ? "" : anchor)
+//                        .append("[")
+//                        .append(matcher.group("label"))
+//                        .append("]");
+//
+//                matcher.appendReplacement(sb, replacement.toString());
+//            }
+//        }
+//        matcher.appendTail(sb);
+//        return sb.toString();
+//    }
+//
+//    /**
+//     * At this point, the Table of Contents that was used to construct this object must be populated.
+//     * @param lines
+//     * @return
+//     */
+//    public List<String> preprocess(@NotNull List<String> lines) {
+//        toc.getEntries().stream()
+//                .map(TableOfContents.Entry::getModuleVariant)
+//                .map(ModuleVariant::getParentLocale)
+//                .map(ModuleLocale::getParent)
+//                .map(Module::getPath)
+//                .forEach(modulePaths::add);
+//
+//        List<String> output = new ArrayList<>();
+//
+//        lines.stream().map(line -> processLineWithPattern(line, XREF_PATTERN))
+//                .map(line -> processLineWithPattern(line, TRIANGLE_PATTERN))
+//                .forEach(output::add);
+//
+//        return output;
+//    }
 }
